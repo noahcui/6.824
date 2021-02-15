@@ -108,6 +108,10 @@ func Worker(mapf func(string, string) []KeyValue,
 			////fmt.Printf("\n\n\n\nout\n\n\n\n")
 			tofind := "mr-" + strconv.Itoa(reply.Id) + "*"
 			filelist, err := filepath.Glob(tofind)
+			/*Not needed in a real distribute system.
+			Because we are actually doing everything under one dir,
+			may cause problems if this task comes from a "crashed" node
+			*/
 			for _, filename := range filelist {
 				os.Remove(filename)
 			}
@@ -116,6 +120,10 @@ func Worker(mapf func(string, string) []KeyValue,
 				oldname := val.Name()
 				val.Close()
 				newname := fmt.Sprintf("mr-%v-%v", reply.Id, key)
+				/*Not needed in a real distribute system.
+				Because we are actually doing everything under one dir,
+				may cause problems if this task comes from a "crashed" node
+				*/
 				os.Remove(newname)
 				err = os.Rename(oldname, newname)
 				if err != nil {
@@ -156,6 +164,10 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 			sort.Sort(ByKey(intermediate))
 			oname := "mr-out-" + strconv.Itoa(reply.Bucket)
+			/*Not needed in a real distribute system.
+			Because we are actually doing everything under one dir,
+			may cause problems if this task comes from a "crashed" node
+			*/
 			os.Remove(oname)
 			ofile, _ := os.Create(oname)
 
