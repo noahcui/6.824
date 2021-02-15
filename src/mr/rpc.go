@@ -27,16 +27,22 @@ type ExampleReply struct {
 // Add your RPC definitions here.
 // Args:
 type Args struct {
-	wid int
+	Wid int
+}
+
+type Report struct {
+	Jobtype int //1: map; 2: reduce
+	Id      int
+	Status  int //0: not assigned yet; 1: running 2: done
 }
 
 // Rely: the reply should be a filename of an as-yet-unstarted map task
 type Reply struct {
-	filename string //the file name.
-	alldone  bool   //all jobs are done.
-	jobtype  int    //0 if nojob, 1 for map, 2 for reduce.
-	id       int    //the task id.
-	bucket   int    //the bucket id
+	Filename string //the file name.
+	Alldone  bool   //all jobs are done.
+	Jobtype  int    //0 if nojob, 1 for map, 2 for reduce.
+	Id       int    //the task id.
+	Bucket   int    //the bucket id
 }
 
 // Cook up a unique-ish UNIX-domain socket name

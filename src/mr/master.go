@@ -1,7 +1,6 @@
 package mr
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -55,52 +54,100 @@ func (m *Master) reducedone() bool {
 	return true
 }
 
+func (m *Master) Longtime() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, v := range m.maptask {
+		if v.status == 1 {
+			runtime := time.Since(v.starttime)
+			if runtime.Seconds() > 10 {
+				v.status = 0
+				m.maptask[i] = v
+			}
+		}
+	}
+
+	for i, v := range m.reducetask {
+		if v.status == 1 {
+			runtime := time.Since(v.starttime)
+			if runtime.Seconds() > 10 {
+				v.status = 0
+				m.reducetask[i] = v
+			}
+		}
+	}
+
+	return nil
+}
+
 // Your code here -- RPC handlers for the worker to call.
 func (m *Master) RPCHandler(args *Args, reply *Reply) error {
+	//check for long running task
+
 	// first fininsh map tasks
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	fmt.Printf("Received task reqirement\n")
+	//fmt.Printf("Received task reqirement\n")
 	if !m.mapdone() {
-		fmt.Printf("Giving map tasks\n")
+		//fmt.Printf("Giving map tasks\n")
 		for i, v := range m.maptask {
 			if v.status == 0 {
 				//reply package
-				reply.id = v.id
-				reply.filename = v.filename
-				reply.jobtype = 1
-				reply.alldone = false
+				reply.Id = v.id
+				reply.Filename = v.filename
+				reply.Jobtype = 1
+				reply.Bucket = m.nreduce
+				reply.Alldone = false
 
 				//Mark the task as running
 				v.status = 1
 				v.starttime = time.Now()
 				m.maptask[i] = v
+				return nil
 			}
 		}
 		return nil
 	}
 	// then, do reduce jobs
 	if !m.reducedone() {
-		fmt.Printf("Giving reuce tasks\n")
+		//fmt.Printf("Giving reduce tasks\n")
 		for i, v := range m.reducetask {
 			if v.status == 0 {
 				//reply package
-				reply.id = v.id
+				reply.Id = v.id
 				//reply.filename = v.bucket
-				reply.jobtype = 2
-				reply.alldone = false
+				reply.Jobtype = 2
+				reply.Alldone = false
+				reply.Bucket = v.bucket
 
 				//Mark the task as running
 				v.status = 1
 				v.starttime = time.Now()
 				m.reducetask[i] = v
+				return nil
 			}
 		}
 		return nil
 	}
 	//all jobs are done
-	reply.alldone = true
-	fmt.Printf("No more task for now\n")
+	if m.Done() {
+		reply.Alldone = true
+	}
+
+	//fmt.Printf("No more task for now\n")
+	return nil
+}
+
+func (m *Master) JobReport(report *Report, feedback *Report) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if report.Jobtype == 1 {
+		m.maptask[report.Id].status = report.Status
+	} else if report.Jobtype == 2 {
+		m.reducetask[report.Id].status = report.Status
+	} else {
+		log.Fatalln("error!")
+	}
 	return nil
 }
 
@@ -135,6 +182,7 @@ func (m *Master) server() {
 // if the entire job has finished.
 //
 func (m *Master) Done() bool {
+
 	ret := false
 
 	// Your code here.
@@ -173,6 +221,13 @@ func MakeMaster(files []string, nReduce int) *Master {
 	}
 	m.nreduce = nReduce
 	m.nfile = len(files)
+	ticker := time.NewTicker(10 * time.Second)
+	go func() {
+		for {
+			<-ticker.C
+			m.Longtime()
+		}
+	}()
 	m.server()
 	return &m
 }
