@@ -79,7 +79,8 @@ type Raft struct {
 	nextIndex   []int
 	matchIndex  []int
 	state       int
-	ticker      *time.Ticker
+	ticker      *time.Timer
+	lasttime    time.Time
 	d           time.Duration
 }
 
@@ -164,22 +165,28 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-
+	// if args term is less than currentterm, means request is out of date.
+	// send info back and ignore this request
 	if args.Term < rf.currentTerm {
 		reply.Term = rf.currentTerm
 		reply.VoteGranted = false
 		return
 	}
+	// if args.term > currentterm, update current term and vote for the args server.
 	if args.Term > rf.currentTerm {
 		rf.currentTerm = args.Term
-		rf.votedFor = -1
+		rf.votedFor = args.CandidateID
+		rf.state = FOLLOWER
+		reply.Term = rf.currentTerm
+	}
+	if rf.state == CANDIDATE && rf.me > args.CandidateID {
+		rf.votedFor = args.CandidateID
 		rf.state = FOLLOWER
 	}
 	if rf.votedFor == -1 || rf.votedFor == args.CandidateID {
 		reply.Term = rf.currentTerm
 		rf.votedFor = args.CandidateID
 		reply.VoteGranted = true
-
 		return
 	}
 	reply.VoteGranted = false
@@ -294,7 +301,8 @@ func (rf *Raft) AppendEntriesHandler(args *AppendEntriesArgs, reply *AppendEntri
 		rf.currentTerm = args.Term
 		reply.Term = rf.currentTerm
 		reply.Success = true
-		rf.ticker.Stop()
+		// rf.ticker.Stop()
+		rf.lasttime = time.Now()
 		rf.ticker.Reset(rf.d)
 	}
 }
@@ -316,18 +324,20 @@ func (rf *Raft) heartbeats() {
 
 			for i, _ := range rf.peers {
 				if i != rf.me {
-					//go func(id int) {
-					reply := AppendEntriesReply{}
-					rf.sendAppendEntries(i, &args, &reply)
-					//out of date, which means this is been blocked out and there's a new leader
-					rf.mu.Lock()
-					if reply.Term > rf.currentTerm {
-						rf.currentTerm = reply.Term
-						rf.state = FOLLOWER
-						rf.votedFor = -1
-					}
-					rf.mu.Unlock()
-					//}(i)
+					//a := time.Now()
+					go func(id int) {
+						reply := AppendEntriesReply{}
+						rf.sendAppendEntries(id, &args, &reply)
+						//out of date, which means this is been blocked out and there's a new leader
+						rf.mu.Lock()
+						if reply.Term > rf.currentTerm {
+							rf.currentTerm = reply.Term
+							rf.state = FOLLOWER
+							rf.votedFor = -1
+						}
+						rf.mu.Unlock()
+					}(i)
+					//fmt.Printf("%v\n", time.Since(a))
 				}
 			}
 
@@ -343,7 +353,7 @@ func (rf *Raft) elect() {
 	rf.state = CANDIDATE
 	rf.votedFor = rf.me
 	args := RequestVoteArgs{}
-
+	// fmt.Printf("election started\n")
 	args.Term = rf.currentTerm
 	args.CandidateID = rf.me
 	rf.mu.Unlock()
@@ -364,12 +374,13 @@ func (rf *Raft) elect() {
 				// 	return true
 				// }
 				// return false
+				voted := ok && reply.VoteGranted && reply.Term == rf.currentTerm
+				rf.mu.Unlock()
+				if voted {
 
-				if ok && reply.VoteGranted && reply.Term == rf.currentTerm {
-					rf.mu.Unlock()
 					ret <- 1
 				} else {
-					rf.mu.Unlock()
+
 					ret <- 0
 				}
 
@@ -379,7 +390,9 @@ func (rf *Raft) elect() {
 	}
 	// wg.Wait()
 	// c := 1
+
 	for i := 0; i < len(rf.peers); i++ {
+
 		vote := <-ctr
 		votes += vote
 		// in case someone is down, set as leader as soon as it got majority.
@@ -398,19 +411,23 @@ func (rf *Raft) election() {
 	//d := time.Duration(rand.Float32()*150+200) * time.Millisecond
 	//ticker := time.NewTicker(d)
 	rf.mu.Lock()
-	rf.ticker = time.NewTicker(rf.d)
+	rf.ticker = time.NewTimer(rf.d)
 	rf.mu.Unlock()
 	for !rf.killed() {
 		<-rf.ticker.C
 		go func() {
+			// var timeout = make(chan bool)
 			rf.mu.Lock()
 			if rf.state == CANDIDATE {
 				go rf.elect()
+
 			} else if rf.state == FOLLOWER {
 				go rf.elect()
+
 			}
 			rf.mu.Unlock()
 		}()
+		rf.ticker.Reset(rf.d)
 	}
 }
 
@@ -441,7 +458,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.state = FOLLOWER
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
-	rf.d = time.Duration(rand.Float32()*150+150) * time.Millisecond
+	rf.d = time.Duration(rand.Float32()*250+250) * time.Millisecond
 
 	go rf.heartbeats()
 
