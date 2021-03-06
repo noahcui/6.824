@@ -22,6 +22,6 @@ fi
 rt=$[$end-$start]
 tt=$[$end-$runtime]
 att=$[$tt/$i]
-printf "round: %-10d |          fail/success: %d/%-10d |          round time(s): %d.%-10d |          ave run-time(s): %d.%-10d |          total run-time(s): %d.%-10d\n" $i $f $s  $[$rt/1000] $[$rt%1000] $[$att/1000] $[$att%1000] $[$tt/1000] $[$tt%1000]  
+printf "round: %-10d |          fail/success: %d/%-10d |          round time(s): %2d.%-10d |          ave run-time(s): %2d.%-10d |          total run-time(s): %d.%-10d\n" $i $f $s  $[$rt/1000] $[$rt%1000] $[$att/1000] $[$att%1000] $[$tt/1000] $[$tt%1000]  
 rm output
 done
