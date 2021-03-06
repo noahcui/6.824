@@ -4,6 +4,7 @@ i=0
 s=0
 f=0
 runtime=`python -c 'import time; print int(time.time() * 1000)'`
+rm output
 while true
 do
 i=$[$i+1]

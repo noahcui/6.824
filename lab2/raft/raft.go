@@ -427,7 +427,9 @@ func (rf *Raft) election() {
 			}
 			rf.mu.Unlock()
 		}()
+		rf.mu.Lock()
 		rf.ticker.Reset(rf.d)
+		rf.mu.Unlock()
 	}
 }
 
