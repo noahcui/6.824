@@ -179,10 +179,10 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		rf.state = FOLLOWER
 		reply.Term = rf.currentTerm
 	}
-	if rf.state == CANDIDATE && rf.me > args.CandidateID {
-		rf.votedFor = args.CandidateID
-		rf.state = FOLLOWER
-	}
+	// if rf.state == CANDIDATE && rf.me > args.CandidateID {
+	// 	rf.votedFor = args.CandidateID
+	// 	rf.state = FOLLOWER
+	// }
 	if rf.votedFor == -1 || rf.votedFor == args.CandidateID {
 		reply.Term = rf.currentTerm
 		rf.votedFor = args.CandidateID
@@ -307,129 +307,127 @@ func (rf *Raft) AppendEntriesHandler(args *AppendEntriesArgs, reply *AppendEntri
 	}
 }
 
+func (rf *Raft) sendbeats() {
+	rf.mu.Lock()
+	if rf.state == LEADER {
+		args := AppendEntriesArgs{}
+		args.Term = rf.currentTerm
+		args.LeaderID = rf.me
+		rf.mu.Unlock()
+		for i, _ := range rf.peers {
+			if i != rf.me {
+				go func(id int) {
+					reply := AppendEntriesReply{}
+					rf.sendAppendEntries(id, &args, &reply)
+					//out of date, which means this is been blocked out and there's a new leader
+					rf.mu.Lock()
+					if reply.Term > rf.currentTerm {
+						rf.currentTerm = reply.Term
+						rf.state = FOLLOWER
+						rf.votedFor = -1
+					}
+					rf.mu.Unlock()
+				}(i)
+			}
+		}
+
+	} else {
+		rf.mu.Unlock()
+	}
+}
+
 //leader send heartbeats to others.
 func (rf *Raft) heartbeats() {
 	ticker := time.NewTicker(150 * time.Millisecond)
 	// Dead is dead forever
 	for !rf.killed() {
 		<-ticker.C
-		rf.mu.Lock()
-		if rf.state == LEADER {
-			//fmt.Printf("abc\n")
-			args := AppendEntriesArgs{}
-
-			args.Term = rf.currentTerm
-			args.LeaderID = rf.me
-			rf.mu.Unlock()
-
-			for i, _ := range rf.peers {
-				if i != rf.me {
-					//a := time.Now()
-					go func(id int) {
-						reply := AppendEntriesReply{}
-						rf.sendAppendEntries(id, &args, &reply)
-						//out of date, which means this is been blocked out and there's a new leader
-						rf.mu.Lock()
-						if reply.Term > rf.currentTerm {
-							rf.currentTerm = reply.Term
-							rf.state = FOLLOWER
-							rf.votedFor = -1
-						}
-						rf.mu.Unlock()
-					}(i)
-					//fmt.Printf("%v\n", time.Since(a))
-				}
-			}
-
-		} else {
-			rf.mu.Unlock()
-		}
+		rf.sendbeats()
 	}
 }
 
-func (rf *Raft) elect() {
+func (rf *Raft) elect(ch chan bool) {
 	rf.mu.Lock()
 	rf.currentTerm++
 	rf.state = CANDIDATE
 	rf.votedFor = rf.me
 	args := RequestVoteArgs{}
-	// fmt.Printf("election started\n")
 	args.Term = rf.currentTerm
 	args.CandidateID = rf.me
 	rf.mu.Unlock()
-	// var wg sync.WaitGroup
-	// var votes []int
-	//var w sync.WaitGroup
 	votes := 1
 	var ctr = make(chan int)
-	//var vote [len(rf.peers)]int
 	for i, _ := range rf.peers {
 		if i != rf.me {
-			// wg.Add(1)
 			go func(ret chan int, id int) {
 				reply := RequestVoteReply{}
 				ok := rf.sendRequestVote(id, &args, &reply)
 				rf.mu.Lock()
-				// if ok && reply.VoteGranted && reply.Term == rf.currentTerm{
-				// 	return true
-				// }
-				// return false
 				voted := ok && reply.VoteGranted && reply.Term == rf.currentTerm
 				rf.mu.Unlock()
 				if voted {
-
 					ret <- 1
 				} else {
-
 					ret <- 0
 				}
-
-				// wg.Done()
 			}(ctr, i)
 		}
 	}
-	// wg.Wait()
-	// c := 1
-
+	// fmt.Printf("fuck\n")
 	for i := 0; i < len(rf.peers); i++ {
-
-		vote := <-ctr
-		votes += vote
-		// in case someone is down, set as leader as soon as it got majority.
-		if votes > len(rf.peers)/2 {
-			rf.mu.Lock()
-			rf.state = LEADER
-			rf.mu.Unlock()
-			break
+		select {
+		case vote := <-ctr:
+			votes += vote
+			if votes > len(rf.peers)/2 {
+				rf.mu.Lock()
+				rf.state = LEADER
+				rf.mu.Unlock()
+				rf.sendbeats()
+				ch <- false
+				return
+			}
+		case <-time.After(rf.d):
+			ch <- true
+			return
 		}
 	}
 
 }
+func (rf *Raft) newelect() {
+	rf.mu.Lock()
+	rf.ticker.Stop()
+	if rf.state == CANDIDATE {
+		channel := make(chan bool)
+		go rf.elect(channel)
+		rf.mu.Unlock()
+		again := <-channel
+		if again {
+			go rf.newelect()
+		}
+	} else if rf.state == FOLLOWER {
+		channel := make(chan bool)
+		go rf.elect(channel)
+		rf.mu.Unlock()
+		again := <-channel
+		if again {
+			go rf.newelect()
+		}
+	} else {
+		rf.mu.Unlock()
+	}
+	rf.ticker.Reset(rf.d)
+}
 
 //schedule a function to begin election under some cases.
 func (rf *Raft) election() {
-	//d := time.Duration(rand.Float32()*150+200) * time.Millisecond
-	//ticker := time.NewTicker(d)
 	rf.mu.Lock()
 	rf.ticker = time.NewTimer(rf.d)
 	rf.mu.Unlock()
 	for !rf.killed() {
 		<-rf.ticker.C
-		go func() {
-			// var timeout = make(chan bool)
-			rf.mu.Lock()
-			if rf.state == CANDIDATE {
-				go rf.elect()
+		go rf.newelect()
 
-			} else if rf.state == FOLLOWER {
-				go rf.elect()
-
-			}
-			rf.mu.Unlock()
-		}()
-		rf.mu.Lock()
 		rf.ticker.Reset(rf.d)
-		rf.mu.Unlock()
 	}
 }
 
