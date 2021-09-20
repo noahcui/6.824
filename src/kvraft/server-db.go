@@ -96,10 +96,13 @@ func (kv *KVServer) exe(op Op) bool {
 
 func (kv *KVServer) resetchan(idx int) {
 	if v, ok := kv.to_exe[idx]; ok {
-		select {
-		case v <- true:
-		default:
-		}
+		// select {
+		// case v <- true:
+		// default:
+		// }
+		// to release memory
+		close(v)
+		delete(kv.to_exe, idx)
 	}
 }
 func (kv *KVServer) Apply(msg *raft.ApplyMsg) {
