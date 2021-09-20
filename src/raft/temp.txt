@@ -1,0 +1,4 @@
+Test (2D): snapshots basic ...
+race: limit on 8128 simultaneously alive goroutines is exceeded, dying
+exit status 66
+FAIL	6.824/raft	397.766s
