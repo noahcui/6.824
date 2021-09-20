@@ -10,7 +10,7 @@ if [ -z "${PID}" ]; then
     rm -r logs
     mkdir logs/
     mkdir logs/history
-    ./test.sh &
+    go test.py 2 8 &
     echo $! >> ${PID_FILE}
 else
     echo "Servers are already started in this folder."

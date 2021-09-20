@@ -9,6 +9,7 @@ if [ -z "${PID}" ]; then
     #go build ../cmd/
     rm -r logs
     mkdir logs/
+    mkdir logs/history
     ./test.sh &
     echo $! >> ${PID_FILE}
 else
