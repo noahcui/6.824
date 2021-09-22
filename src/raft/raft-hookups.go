@@ -12,7 +12,7 @@ func (rf *Raft) applierhookupchannel() {
 		rf.mu.Lock()
 		if rf.lastApplied < rf.commitIndex &&
 			rf.lastApplied < rf.getLastindex() &&
-			rf.lastApplied+1 > rf.lastIncludedIndex {
+			rf.lastApplied+1 > rf.LastIncludedIndex {
 			for rf.lastApplied < rf.commitIndex {
 				rf.lastApplied++
 				msg := ApplyMsg{
@@ -36,7 +36,7 @@ func (rf *Raft) applierhookup() {
 	for !rf.killed() {
 		if rf.lastApplied < rf.commitIndex &&
 			rf.lastApplied < rf.getLastindex() &&
-			rf.lastApplied+1 > rf.lastIncludedIndex {
+			rf.lastApplied+1 > rf.LastIncludedIndex {
 			for rf.lastApplied < rf.commitIndex {
 				rf.lastApplied++
 				msg := ApplyMsg{

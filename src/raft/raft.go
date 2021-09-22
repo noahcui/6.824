@@ -52,12 +52,13 @@ func (rf *Raft) persistsnapshot() {
 	e.Encode(rf.currentTerm)
 	e.Encode(rf.votedFor)
 	e.Encode(rf.log)
-	e.Encode(rf.lastIncludedIndex)
+	e.Encode(rf.LastIncludedIndex)
 	e.Encode(rf.LastIncludedTerm)
 	data := w.Bytes()
 	// blindly saving snapshots, this may wast resouses, but makes coding eaiser
 	// will optimize this later
 	rf.persister.SaveStateAndSnapshot(data, rf.snapshot)
+
 }
 
 func (rf *Raft) persist() {
@@ -68,7 +69,7 @@ func (rf *Raft) persist() {
 	e.Encode(rf.currentTerm)
 	e.Encode(rf.votedFor)
 	e.Encode(rf.log)
-	e.Encode(rf.lastIncludedIndex)
+	e.Encode(rf.LastIncludedIndex)
 	e.Encode(rf.LastIncludedTerm)
 	data := w.Bytes()
 	// blindly saving snapshots, this may wast resouses, but makes coding eaiser
@@ -103,7 +104,7 @@ func (rf *Raft) readPersist(data []byte) {
 		rf.currentTerm = ct
 		rf.votedFor = vf
 		rf.log = lg
-		rf.lastIncludedIndex = li
+		rf.LastIncludedIndex = li
 		rf.LastIncludedTerm = lt
 		rf.commitIndex = li
 		rf.lastApplied = li
@@ -111,6 +112,16 @@ func (rf *Raft) readPersist(data []byte) {
 		rf.snapshot = make([]byte, len(snp))
 		copy(rf.snapshot, snp)
 	}
+	// msg := ApplyMsg{
+	// 	CommandValid:  false,
+	// 	SnapshotValid: true,
+	// 	SnapshotTerm:  rf.LastIncludedTerm,
+	// 	SnapshotIndex: rf.LastIncludedIndex,
+	// }
+	// msg.Snapshot = make([]byte, len(rf.snapshot))
+	// copy(msg.Snapshot, rf.snapshot)
+	// rf.applyCh <- msg
+
 }
 
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
@@ -203,7 +214,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.state = FOLLOWER
 	rf.applyCh = applyCh
 	rf.vc = 0
-	rf.lastIncludedIndex = 0
+	rf.LastIncludedIndex = 0
 	rf.LastIncludedTerm = 0
 	rf.snapshot = nil
 	rf.applywaiter = sync.NewCond(&rf.mu)

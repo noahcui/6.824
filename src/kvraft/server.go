@@ -76,7 +76,10 @@ func (kv *KVServer) killed() bool {
 // StartKVServer() must return quickly, so it should start goroutines
 // for any long-running work.
 //
-
+func (kv *KVServer) Startfrompersister() {
+	kv.installsnapshot(kv.persister.ReadSnapshot())
+	kv.lastindex = kv.rf.LastIncludedIndex
+}
 func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister, maxraftstate int) *KVServer {
 	// call labgob.Register on structures you want
 	// Go's RPC library to marshall/unmarshall.
@@ -95,20 +98,22 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.counters = make(map[int64]int64)
 	// You may need initialization code here.
 	kv.data = make(map[string]string)
-	kv.installsnapshot(kv.persister.ReadSnapshot())
+
+	kv.Startfrompersister()
 	go func() {
 		for !kv.killed() {
-			// msg := <-kv.applyCh
-			for msg := range kv.applyCh {
-				if &msg != nil {
-					if msg.CommandValid {
-						kv.Apply(&msg)
-					} else if msg.SnapshotValid && maxraftstate != -1 {
-						kv.TryInstallSnapshot(&msg)
-					}
+			msg := <-kv.applyCh
+			// for msg := range kv.applyCh {
+			if &msg != nil {
+				if msg.CommandValid {
+					kv.Apply(&msg)
+				} else if msg.SnapshotValid && maxraftstate != -1 {
+					kv.TryInstallSnapshot(&msg)
 				}
 			}
 		}
+		// }
 	}()
+
 	return kv
 }

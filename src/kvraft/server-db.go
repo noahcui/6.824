@@ -108,7 +108,7 @@ func (kv *KVServer) resetchan(idx int) {
 func (kv *KVServer) Apply(msg *raft.ApplyMsg) {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
-	if msg.CommandIndex == kv.lastindex+1 {
+	if msg.CommandIndex > kv.lastindex {
 		args, ok := msg.Command.(Op)
 		if ok {
 			if kv.counters[args.ClientID] == args.ID {

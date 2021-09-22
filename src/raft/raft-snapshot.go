@@ -5,10 +5,10 @@ package raft
 // have more recent info since it communicate the snapshot on applyCh.
 //
 
-func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int, snapshot []byte) bool {
+func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, LastIncludedIndex int, snapshot []byte) bool {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if rf.commitIndex >= lastIncludedIndex {
+	if rf.commitIndex >= LastIncludedIndex {
 		return false
 	}
 	if rf.getterm(rf.commitIndex) > lastIncludedTerm {
@@ -17,16 +17,16 @@ func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int,
 	defer func() {
 		rf.snapshot = make([]byte, len(snapshot))
 		copy(rf.snapshot, snapshot)
-		rf.lastApplied = lastIncludedIndex
-		rf.lastIncludedIndex = lastIncludedIndex
-		rf.commitIndex = lastIncludedIndex
+		rf.lastApplied = LastIncludedIndex
+		rf.LastIncludedIndex = LastIncludedIndex
+		rf.commitIndex = LastIncludedIndex
 		rf.LastIncludedTerm = lastIncludedTerm
 		rf.persistsnapshot()
 	}()
 	var to_append []LogEntry = nil
-	if lastIncludedIndex <= rf.getLastindex() &&
-		rf.getterm(lastIncludedIndex) == lastIncludedTerm {
-		to_append = rf.log[rf.getLogindex(lastIncludedIndex+1):]
+	if LastIncludedIndex <= rf.getLastindex() &&
+		rf.getterm(LastIncludedIndex) == lastIncludedTerm {
+		to_append = rf.log[rf.getLogindex(LastIncludedIndex+1):]
 	}
 	rf.log = make([]LogEntry, 1)
 	rf.log[0].Term = lastIncludedTerm
@@ -48,7 +48,7 @@ func (rf *Raft) InstallSnapshot(args *SnapshotArg, reply *SnapshotReply) {
 
 	rf.send(rf.beat, 1)
 	reply.Ok = true
-	if rf.lastIncludedIndex >= args.LastIncludedIndex {
+	if rf.LastIncludedIndex >= args.LastIncludedIndex {
 		return
 	}
 
@@ -92,12 +92,15 @@ func (rf *Raft) sendSnapshot(server int, args *SnapshotArg, reply *SnapshotReply
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if index <= rf.lastIncludedIndex {
+	if index <= rf.LastIncludedIndex {
+		return
+	}
+	if index > rf.lastApplied {
 		return
 	}
 	to_append := rf.log[rf.getLogindex(index+1):]
 	rf.LastIncludedTerm = rf.getterm(index)
-	rf.lastIncludedIndex = index
+	rf.LastIncludedIndex = index
 	rf.log = make([]LogEntry, 1)
 	rf.log[0].Term = rf.LastIncludedTerm
 	rf.log[0].Command = nil
@@ -113,7 +116,7 @@ func (rf *Raft) snapshotsender(id int) {
 	}
 	args := SnapshotArg{
 		Term:              rf.currentTerm,
-		LastIncludedIndex: rf.lastIncludedIndex,
+		LastIncludedIndex: rf.LastIncludedIndex,
 		LastIncludedTerm:  rf.LastIncludedTerm,
 	}
 	args.Data = make([]byte, len(rf.snapshot))

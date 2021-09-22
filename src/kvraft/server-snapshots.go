@@ -22,6 +22,7 @@ func (kv *KVServer) installsnapshot(snapshot []byte) {
 		d.Decode(&kv.lastindex) != nil {
 		log.Fatalf("decode error\n")
 	}
+	// making sure all channels are freed
 	for idx := lastindex; idx <= kv.lastindex; idx++ {
 		kv.resetchan(idx)
 	}

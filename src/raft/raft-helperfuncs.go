@@ -61,10 +61,10 @@ func (rf *Raft) toc(state int) {
 }
 
 func (rf *Raft) getLastindex() int {
-	return len(rf.log) - 1 + rf.lastIncludedIndex
+	return len(rf.log) - 1 + rf.LastIncludedIndex
 }
 func (rf *Raft) getLogindex(idx int) int {
-	return idx - rf.lastIncludedIndex
+	return idx - rf.LastIncludedIndex
 }
 
 func (rf *Raft) getterm(idx int) int {

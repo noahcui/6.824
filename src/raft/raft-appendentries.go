@@ -3,7 +3,7 @@ package raft
 func (rf *Raft) apply() {
 	if rf.lastApplied < rf.commitIndex &&
 		rf.lastApplied < rf.getLastindex() &&
-		rf.lastApplied+1 > rf.lastIncludedIndex {
+		rf.lastApplied+1 > rf.LastIncludedIndex {
 		for rf.lastApplied < rf.commitIndex {
 			rf.lastApplied++
 			msg := ApplyMsg{
@@ -60,7 +60,7 @@ func (rf *Raft) AppendEntriesHandler(args *AppendEntriesArgs, reply *AppendEntri
 	reply.Term = rf.currentTerm
 	reply.NewIndex = -1
 	reply.NewTerm = -1
-	if args.PrevLogIndex < rf.lastIncludedIndex {
+	if args.PrevLogIndex < rf.LastIncludedIndex {
 		return
 	}
 	// check if there's no enty at previndex at all
@@ -72,7 +72,7 @@ func (rf *Raft) AppendEntriesHandler(args *AppendEntriesArgs, reply *AppendEntri
 	if rf.getterm(args.PrevLogIndex) != args.PrevLogTerm {
 		if cfTerm := rf.getterm(args.PrevLogIndex); cfTerm != args.PrevLogTerm {
 			reply.NewTerm = cfTerm
-			for i := args.PrevLogIndex; i >= rf.lastIncludedIndex && rf.getterm(i) == cfTerm; i-- {
+			for i := args.PrevLogIndex; i >= rf.LastIncludedIndex && rf.getterm(i) == cfTerm; i-- {
 				reply.NewIndex = i
 			}
 			return
@@ -152,14 +152,14 @@ func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *Ap
 		rf.sendto(server)
 	} else {
 		newNextIndex := rf.getLastindex()
-		for ; newNextIndex > rf.lastIncludedIndex; newNextIndex-- {
+		for ; newNextIndex > rf.LastIncludedIndex; newNextIndex-- {
 			//found match.
 			if rf.getterm(newNextIndex) == reply.NewTerm {
 				break
 			}
 		}
 		// if not found, set nextIndex to conflictIndex
-		if newNextIndex <= rf.lastIncludedIndex {
+		if newNextIndex <= rf.LastIncludedIndex {
 			rf.nextIndex[server] = reply.NewIndex
 		} else {
 			rf.nextIndex[server] = newNextIndex
@@ -178,7 +178,7 @@ func (rf *Raft) sendto(i int) {
 	args.Term = rf.currentTerm
 	args.LeaderID = rf.me
 	args.PrevLogIndex = rf.nextIndex[i] - 1
-	if args.PrevLogIndex < rf.lastIncludedIndex {
+	if args.PrevLogIndex < rf.LastIncludedIndex {
 		rf.snapshotsender(i)
 		// fmt.Println(rf.snapshot)
 		return

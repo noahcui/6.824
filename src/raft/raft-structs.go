@@ -48,7 +48,7 @@ type Raft struct {
 	tryapply chan int
 	// beatnow           chan int
 	applywaiter       *sync.Cond
-	lastIncludedIndex int
+	LastIncludedIndex int
 	LastIncludedTerm  int
 	snapshot          []byte
 }
