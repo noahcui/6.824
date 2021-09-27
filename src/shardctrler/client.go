@@ -4,14 +4,20 @@ package shardctrler
 // Shardctrler clerk.
 //
 
-import "6.824/labrpc"
-import "time"
-import "crypto/rand"
-import "math/big"
+import (
+	"crypto/rand"
+	"math/big"
+	"time"
+
+	"6.824/labrpc"
+)
 
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// Your data here.
+	leaderID int
+	clientID int64
+	counter  int64
 }
 
 func nrand() int64 {
@@ -24,6 +30,9 @@ func nrand() int64 {
 func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
+	ck.clientID = nrand()
+	ck.leaderID = 0
+	ck.counter = 0
 	// Your code here.
 	return ck
 }
@@ -49,7 +58,10 @@ func (ck *Clerk) Join(servers map[int][]string) {
 	args := &JoinArgs{}
 	// Your code here.
 	args.Servers = servers
-
+	args.ClientID = ck.clientID
+	args.ID = ck.counter
+	args.Op = "Join"
+	ck.counter++
 	for {
 		// try each known server.
 		for _, srv := range ck.servers {
@@ -67,7 +79,10 @@ func (ck *Clerk) Leave(gids []int) {
 	args := &LeaveArgs{}
 	// Your code here.
 	args.GIDs = gids
-
+	args.ClientID = ck.clientID
+	args.ID = ck.counter
+	args.Op = "Leave"
+	ck.counter++
 	for {
 		// try each known server.
 		for _, srv := range ck.servers {

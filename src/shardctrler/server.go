@@ -1,45 +1,47 @@
 package shardctrler
 
+import (
+	"sync"
 
-import "6.824/raft"
-import "6.824/labrpc"
-import "sync"
-import "6.824/labgob"
-
+	"6.824/labgob"
+	"6.824/labrpc"
+	"6.824/raft"
+)
 
 type ShardCtrler struct {
-	mu      sync.Mutex
-	me      int
-	rf      *raft.Raft
-	applyCh chan raft.ApplyMsg
-
+	mu        sync.Mutex
+	me        int
+	rf        *raft.Raft
+	applyCh   chan raft.ApplyMsg
+	persister *raft.Persister
+	dead      int32 // set by Kill()
 	// Your data here.
 
-	configs []Config // indexed by config num
+	maxraftstate int // snapshot if log grows this big
+	lastindex    int
+	// Your definitions here.
+	data     map[string]string
+	to_exe   map[int]chan bool
+	counters map[int64]int64
+	configs  []Config // indexed by config num
 }
-
-
 type Op struct {
-	// Your data here.
+	// Your definitions here.
+	// Field names must start with capital letters,
+	// otherwise RPC will break.
+	Type     string
+	Key      string
+	Value    string
+	ClientID int64
+	ID       int64
+	Servers  map[int][]string
+	GIDs     []int
 }
 
-
-func (sc *ShardCtrler) Join(args *JoinArgs, reply *JoinReply) {
-	// Your code here.
+type waiter struct {
+	ch chan bool
+	op *Op
 }
-
-func (sc *ShardCtrler) Leave(args *LeaveArgs, reply *LeaveReply) {
-	// Your code here.
-}
-
-func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
-	// Your code here.
-}
-
-func (sc *ShardCtrler) Query(args *QueryArgs, reply *QueryReply) {
-	// Your code here.
-}
-
 
 //
 // the tester calls Kill() when a ShardCtrler instance won't
@@ -52,9 +54,16 @@ func (sc *ShardCtrler) Kill() {
 	// Your code here, if desired.
 }
 
-// needed by shardkv tester
-func (sc *ShardCtrler) Raft() *raft.Raft {
-	return sc.rf
+func (sc *ShardCtrler) resetchan(idx int) {
+	if v, ok := sc.to_exe[idx]; ok {
+		// select {
+		// case v <- true:
+		// default:
+		// }
+		// to release memory
+		close(v)
+		delete(sc.to_exe, idx)
+	}
 }
 
 //

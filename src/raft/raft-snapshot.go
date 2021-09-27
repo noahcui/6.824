@@ -48,6 +48,7 @@ func (rf *Raft) InstallSnapshot(args *SnapshotArg, reply *SnapshotReply) {
 
 	rf.send(rf.beat, 1)
 	reply.Ok = true
+	// never go back
 	if rf.LastIncludedIndex >= args.LastIncludedIndex {
 		return
 	}

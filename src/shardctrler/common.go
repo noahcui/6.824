@@ -20,6 +20,43 @@ package shardctrler
 // The number of shards.
 const NShards = 10
 
+const (
+	OK             = "OK"
+	ErrNoKey       = "ErrNoKey"
+	ErrWrongLeader = "ErrWrongLeader"
+)
+
+type Err string
+
+// Put or Append
+type PutAppendArgs struct {
+	Key   string
+	Value string
+	Op    string // "Put" or "Append"
+	// You'll have to add definitions here.
+	// Field names must start with capital letters,
+	// otherwise RPC will break.
+	Type     int
+	ClientID int64
+	ID       int64
+}
+
+type PutAppendReply struct {
+	Err Err
+}
+
+type GetArgs struct {
+	Key      string
+	ClientID int64
+	ID       int64
+	// You'll have to add definitions here.
+}
+
+type GetReply struct {
+	Err   Err
+	Value string
+}
+
 // A configuration -- an assignment of shards to groups.
 // Please don't change this.
 type Config struct {
@@ -28,14 +65,11 @@ type Config struct {
 	Groups map[int][]string // gid -> servers[]
 }
 
-const (
-	OK = "OK"
-)
-
-type Err string
-
 type JoinArgs struct {
-	Servers map[int][]string // new GID -> servers mappings
+	Servers  map[int][]string // new GID -> servers mappings
+	ClientID int64
+	ID       int64
+	Op       string
 }
 
 type JoinReply struct {
@@ -44,7 +78,10 @@ type JoinReply struct {
 }
 
 type LeaveArgs struct {
-	GIDs []int
+	GIDs     []int
+	ClientID int64
+	ID       int64
+	Op       string
 }
 
 type LeaveReply struct {

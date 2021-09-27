@@ -1,0 +1,59 @@
+round number of failure: 174
+
+Test: one client (3A) ...
+  ... Passed --  15.1  5  3386  664
+Test: ops complete fast enough (3A) ...
+  ... Passed --  23.5  3  3056    0
+Test: many clients (3A) ...
+  ... Passed --  15.8  5  4128  749
+Test: unreliable net, many clients (3A) ...
+  ... Passed --  16.4  5  5073  783
+Test: concurrent append to same key, unreliable (3A) ...
+  ... Passed --   0.7  3   195   52
+Test: progress in majority (3A) ...
+  ... Passed --   0.2  5    50    2
+Test: no progress in minority (3A) ...
+  ... Passed --   1.0  5   182    3
+Test: completion after heal (3A) ...
+  ... Passed --   1.0  5    98    3
+Test: partitions, one client (3A) ...
+  ... Passed --  22.5  5  4255  485
+Test: partitions, many clients (3A) ...
+  ... Passed --  23.3  5  6526  756
+Test: restarts, one client (3A) ...
+  ... Passed --  18.9  5  3694  668
+Test: restarts, many clients (3A) ...
+  ... Passed --  20.1  5  5777  779
+Test: unreliable net, restarts, many clients (3A) ...
+  ... Passed --  20.6  5  5690  778
+Test: restarts, partitions, many clients (3A) ...
+  ... Passed --  26.9  5  6796  791
+Test: unreliable net, restarts, partitions, many clients (3A) ...
+--- FAIL: TestPersistPartitionUnreliable3A (28.28s)
+panic: interface conversion: interface {} is nil, not models.KvInput [recovered]
+	panic: interface conversion: interface {} is nil, not models.KvInput
+
+goroutine 131731 [running]:
+testing.tRunner.func1.1(0x12fc300, 0xc000666990)
+	/usr/local/Cellar/go/1.15.7_1/libexec/src/testing/testing.go:1072 +0x46a
+testing.tRunner.func1(0xc001432180)
+	/usr/local/Cellar/go/1.15.7_1/libexec/src/testing/testing.go:1075 +0x636
+panic(0x12fc300, 0xc000666990)
+	/usr/local/Cellar/go/1.15.7_1/libexec/src/runtime/panic.go:975 +0x47a
+6.824/models.glob..func4(0x0, 0x0, 0x1300280, 0xc001257600, 0xc0014c16b0, 0x2a)
+	/Users/noahcui/Desktop/UNH/21spring/mit-6.824/Codes/6.824/src/models/kv.go:56 +0x485
+6.824/porcupine.computeVisualizationData(0x1347910, 0x1347940, 0x1347918, 0x1347920, 0x1347950, 0x1347928, 0x1347938, 0xc001892580, 0x5, 0x5, ...)
+	/Users/noahcui/Desktop/UNH/21spring/mit-6.824/Codes/6.824/src/porcupine/visualization.go:50 +0x2da
+6.824/porcupine.Visualize(0x1347910, 0x0, 0x1347918, 0x1347920, 0x0, 0x1347928, 0x0, 0xc001892580, 0x5, 0x5, ...)
+	/Users/noahcui/Desktop/UNH/21spring/mit-6.824/Codes/6.824/src/porcupine/visualization.go:90 +0x114
+6.824/kvraft.GenericTest(0xc001432180, 0x1333d5e, 0x2, 0x5, 0x5, 0x10101, 0xffffffffffffffff, 0xc0011a1e00)
+	/Users/noahcui/Desktop/UNH/21spring/mit-6.824/Codes/6.824/src/kvraft/test_test.go:369 +0x109c
+6.824/kvraft.TestPersistPartitionUnreliable3A(0xc001432180)
+	/Users/noahcui/Desktop/UNH/21spring/mit-6.824/Codes/6.824/src/kvraft/test_test.go:580 +0x7a
+testing.tRunner(0xc001432180, 0x1347850)
+	/usr/local/Cellar/go/1.15.7_1/libexec/src/testing/testing.go:1123 +0x203
+created by testing.(*T).Run
+	/usr/local/Cellar/go/1.15.7_1/libexec/src/testing/testing.go:1168 +0x5bc
+exit status 2
+FAIL	6.824/kvraft	234.856s
+
