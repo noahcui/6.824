@@ -1,15 +1,19 @@
 package shardkv
 
-import "6.824/porcupine"
-import "6.824/models"
-import "testing"
-import "strconv"
-import "time"
-import "fmt"
-import "sync/atomic"
-import "sync"
-import "math/rand"
-import "io/ioutil"
+import (
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"6.824/log"
+	"6.824/models"
+	"6.824/porcupine"
+)
 
 const linearizabilityCheckTimeout = 1 * time.Second
 
@@ -38,6 +42,7 @@ func TestStaticShards(t *testing.T) {
 	ka := make([]string, n)
 	va := make([]string, n)
 	for i := 0; i < n; i++ {
+		// fmt.Println(i)
 		ka[i] = strconv.Itoa(i) // ensure multiple shards
 		va[i] = randstring(20)
 		ck.Put(ka[i], va[i])
@@ -45,7 +50,6 @@ func TestStaticShards(t *testing.T) {
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])
 	}
-
 	// make sure that the data really is sharded by
 	// shutting down one shard and checking that some
 	// Get()s don't succeed.
@@ -128,20 +132,25 @@ func TestJoinLeave(t *testing.T) {
 	cfg.leave(0)
 
 	for i := 0; i < n; i++ {
+		// fmt.Printf("%v ", i)
 		check(t, ck, ka[i], va[i])
+		// fmt.Println(i)
 		x := randstring(5)
 		ck.Append(ka[i], x)
 		va[i] += x
 	}
-
+	// fmt.Println("here")
 	// allow time for shards to transfer.
-	time.Sleep(1 * time.Second)
-
+	time.Sleep(2 * time.Second)
+	// fmt.Println("***FUCK1***")
 	cfg.checklogs()
+	// fmt.Println("---FUCK2---")
 	cfg.ShutdownGroup(0)
 
 	for i := 0; i < n; i++ {
+		// fmt.Printf("%v ", i)
 		check(t, ck, ka[i], va[i])
+		// fmt.Println(i)
 	}
 
 	fmt.Printf("  ... Passed\n")
@@ -224,7 +233,7 @@ func TestMissChange(t *testing.T) {
 	ck := cfg.makeClient()
 
 	cfg.join(0)
-
+	counter := 0
 	n := 10
 	ka := make([]string, n)
 	va := make([]string, n)
@@ -236,7 +245,8 @@ func TestMissChange(t *testing.T) {
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])
 	}
-
+	//log.Debugf("%v", counter)
+	counter++
 	cfg.join(1)
 
 	cfg.ShutdownServer(0, 0)
@@ -247,13 +257,19 @@ func TestMissChange(t *testing.T) {
 	cfg.leave(1)
 	cfg.leave(0)
 
+	log.Debugf("%v", counter)
+	counter++
+
 	for i := 0; i < n; i++ {
+		log.Debugf("after first shutdown %v", i)
+
 		check(t, ck, ka[i], va[i])
 		x := randstring(20)
 		ck.Append(ka[i], x)
 		va[i] += x
 	}
-
+	log.Debugf("%v", counter)
+	counter++
 	cfg.join(1)
 
 	for i := 0; i < n; i++ {
@@ -263,16 +279,23 @@ func TestMissChange(t *testing.T) {
 		va[i] += x
 	}
 
+	log.Debugf("%v", counter)
+	counter++
+
 	cfg.StartServer(0, 0)
 	cfg.StartServer(1, 0)
 	cfg.StartServer(2, 0)
 
 	for i := 0; i < n; i++ {
+		log.Debugf("after second shutdown %v", i)
 		check(t, ck, ka[i], va[i])
 		x := randstring(20)
 		ck.Append(ka[i], x)
 		va[i] += x
 	}
+
+	log.Debugf("%v", counter)
+	counter++
 
 	time.Sleep(2 * time.Second)
 
@@ -282,6 +305,8 @@ func TestMissChange(t *testing.T) {
 
 	cfg.join(0)
 	cfg.leave(2)
+	log.Debugf("%v", counter)
+	counter++
 
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])
@@ -289,6 +314,8 @@ func TestMissChange(t *testing.T) {
 		ck.Append(ka[i], x)
 		va[i] += x
 	}
+	log.Debugf("%v", counter)
+	counter++
 
 	cfg.StartServer(0, 1)
 	cfg.StartServer(1, 1)
@@ -297,6 +324,8 @@ func TestMissChange(t *testing.T) {
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])
 	}
+	log.Debugf("%v", counter)
+	counter++
 
 	fmt.Printf("  ... Passed\n")
 }
@@ -663,6 +692,7 @@ func TestUnreliable3(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 }
 
+/*
 //
 // optional test to see whether servers are deleting
 // shards for which they are no longer responsible.
@@ -747,7 +777,7 @@ func TestChallenge1Delete(t *testing.T) {
 
 	fmt.Printf("  ... Passed\n")
 }
-
+*/
 func TestChallenge1Concurrent(t *testing.T) {
 	fmt.Printf("Test: concurrent configuration change and restart (challenge 1)...\n")
 
@@ -816,6 +846,7 @@ func TestChallenge1Concurrent(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 }
 
+/*
 //
 // optional test to see whether servers can handle
 // shards that are not affected by a config change
@@ -946,3 +977,4 @@ func TestChallenge2Partial(t *testing.T) {
 
 	fmt.Printf("  ... Passed\n")
 }
+*/

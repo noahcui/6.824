@@ -90,8 +90,11 @@ type LeaveReply struct {
 }
 
 type MoveArgs struct {
-	Shard int
-	GID   int
+	Shard    int
+	GID      int
+	ClientID int64
+	ID       int64
+	Op       string
 }
 
 type MoveReply struct {
@@ -100,7 +103,10 @@ type MoveReply struct {
 }
 
 type QueryArgs struct {
-	Num int // desired config number
+	Num      int // desired config number
+	ClientID int64
+	ID       int64
+	Op       string
 }
 
 type QueryReply struct {

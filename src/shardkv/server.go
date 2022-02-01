@@ -1,39 +1,48 @@
 package shardkv
 
+import (
+	"sync"
+	"sync/atomic"
 
-import "6.824/labrpc"
-import "6.824/raft"
-import "sync"
-import "6.824/labgob"
+	"6.824/labgob"
+	"6.824/labrpc"
+	"6.824/raft"
+	"6.824/shardctrler"
+)
 
-
-
-type Op struct {
-	// Your definitions here.
-	// Field names must start with capital letters,
-	// otherwise RPC will break.
+type rt struct {
+	val string
+	err Err
 }
 
 type ShardKV struct {
 	mu           sync.Mutex
+	mu1          sync.Mutex
 	me           int
 	rf           *raft.Raft
+	persister    *raft.Persister
 	applyCh      chan raft.ApplyMsg
 	make_end     func(string) *labrpc.ClientEnd
 	gid          int
 	ctrlers      []*labrpc.ClientEnd
 	maxraftstate int // snapshot if log grows this big
-
 	// Your definitions here.
-}
 
-
-func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) {
-	// Your code here.
-}
-
-func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
-	// Your code here.
+	// pre-sharding and packaging, making life eaiser
+	to_exe    map[int]chan bool
+	lastindex int
+	dead      int32 // set by Kill()
+	sm        *shardctrler.Clerk
+	config    shardctrler.Config
+	s         [shardctrler.NShards]bool
+	// nextConfig shardctrler.Config
+	data     [shardctrler.NShards]map[string]string
+	counters [shardctrler.NShards]map[int64]int64
+	todate   bool
+	saved    int
+	ss       [shardctrler.NShards]int
+	ps       [shardctrler.NShards]map[string]string
+	pc       [shardctrler.NShards]map[int64]int64
 }
 
 //
@@ -47,6 +56,10 @@ func (kv *ShardKV) Kill() {
 	// Your code here, if desired.
 }
 
+func (kv *ShardKV) killed() bool {
+	z := atomic.LoadInt32(&kv.dead)
+	return z == 1
+}
 
 //
 // servers[] contains the ports of the servers in this group.
@@ -76,6 +89,11 @@ func (kv *ShardKV) Kill() {
 // StartServer() must return quickly, so it should start goroutines
 // for any long-running work.
 //
+func (kv *ShardKV) Startfrompersister() {
+	kv.installsnapshot(kv.persister.ReadSnapshot())
+	kv.lastindex = kv.rf.LastIncludedIndex
+}
+
 func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister, maxraftstate int, gid int, ctrlers []*labrpc.ClientEnd, make_end func(string) *labrpc.ClientEnd) *ShardKV {
 	// call labgob.Register on structures you want
 	// Go's RPC library to marshall/unmarshall.
@@ -85,17 +103,29 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	kv.me = me
 	kv.maxraftstate = maxraftstate
 	kv.make_end = make_end
+	// gid is uniq and not changing
 	kv.gid = gid
 	kv.ctrlers = ctrlers
-
+	kv.persister = persister
 	// Your initialization code here.
-
 	// Use something like this to talk to the shardctrler:
 	// kv.mck = shardctrler.MakeClerk(kv.ctrlers)
 
 	kv.applyCh = make(chan raft.ApplyMsg)
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
-
-
+	kv.sm = shardctrler.MakeClerk(kv.ctrlers)
+	kv.to_exe = make(map[int]chan bool)
+	// we only care about order, val doesn't matter
+	// kv.counters = make(map[int64]int64)
+	// You may need initialization code here.
+	for sid := 0; sid < shardctrler.NShards; sid++ {
+		kv.data[sid] = make(map[string]string)
+		kv.counters[sid] = make(map[int64]int64)
+		kv.ps[sid] = make(map[string]string)
+		kv.pc[sid] = make(map[int64]int64)
+	}
+	kv.Startfrompersister()
+	go kv.applier(maxraftstate)
+	go kv.Poll()
 	return kv
 }

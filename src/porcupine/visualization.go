@@ -782,17 +782,17 @@ text {
               if (found) {
                 // part of linearization
                 if (prev !== null) {
-                  msg = '<strong>Previous state:</strong><br>' + prev['StateDescription'] + '<br><br>'
+                  msg = '<strong>Previous state:</strong>' + prev['StateDescription'] + ''
                 }
-                msg += '<strong>New state:</strong><br>' + curr['StateDescription'] +
-                  '<br><br>Call: ' + call +
-                  '<br><br>Return: ' + ret
+                msg += '<strong>New state:</strong>' + curr['StateDescription'] +
+                  'Call: ' + call +
+                  'Return: ' + ret
               } else if (illegalLast[partition][maxIndex].has(index)) {
                 // illegal next one
-                msg = '<strong>Previous state:</strong><br>' + lin[lin.length-1]['StateDescription'] +
-                  '<br><br><strong>New state:</strong><br>&langle;invalid op&rangle;' +
-                  '<br><br>Call: ' + call +
-                  '<br><br>Return: ' + ret
+                msg = '<strong>Previous state:</strong>' + lin[lin.length-1]['StateDescription'] +
+                  '<strong>New state:</strong>&langle;invalid op&rangle;' +
+                  'Call: ' + call +
+                  'Return: ' + ret
               } else {
                 // not part of this one
                 msg = 'Not part of selected element\'s partial linearization.'

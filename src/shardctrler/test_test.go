@@ -1,12 +1,12 @@
 package shardctrler
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 )
 
 // import "time"
-import "fmt"
 
 func check(t *testing.T, groups []int, ck *Clerk) {
 	c := ck.Query(-1)
@@ -57,6 +57,7 @@ func check_same_config(t *testing.T, c1 Config, c2 Config) {
 		t.Fatalf("Num wrong")
 	}
 	if c1.Shards != c2.Shards {
+		// fmt.Println(c1, c2)
 		t.Fatalf("Shards wrong")
 	}
 	if len(c1.Groups) != len(c2.Groups) {
@@ -93,6 +94,7 @@ func TestBasic(t *testing.T) {
 
 	var gid1 int = 1
 	ck.Join(map[int][]string{gid1: []string{"x", "y", "z"}})
+
 	check(t, []int{gid1}, ck)
 	cfa[1] = ck.Query(-1)
 
@@ -100,7 +102,7 @@ func TestBasic(t *testing.T) {
 	ck.Join(map[int][]string{gid2: []string{"a", "b", "c"}})
 	check(t, []int{gid1, gid2}, ck)
 	cfa[2] = ck.Query(-1)
-
+	// fmt.Println(cfa[2])
 	cfx := ck.Query(-1)
 	sa1 := cfx.Groups[gid1]
 	if len(sa1) != 3 || sa1[0] != "x" || sa1[1] != "y" || sa1[2] != "z" {
@@ -110,11 +112,9 @@ func TestBasic(t *testing.T) {
 	if len(sa2) != 3 || sa2[0] != "a" || sa2[1] != "b" || sa2[2] != "c" {
 		t.Fatalf("wrong servers for gid %v: %v\n", gid2, sa2)
 	}
-
 	ck.Leave([]int{gid1})
 	check(t, []int{gid2}, ck)
 	cfa[4] = ck.Query(-1)
-
 	ck.Leave([]int{gid2})
 	cfa[5] = ck.Query(-1)
 
@@ -125,6 +125,10 @@ func TestBasic(t *testing.T) {
 	for s := 0; s < nservers; s++ {
 		cfg.ShutdownServer(s)
 		for i := 0; i < len(cfa); i++ {
+			// if i == 3 {
+			// 	fmt.Println(cfa[i])
+			// 	fmt.Println(ck.Query(cfa[i].Num))
+			// }
 			c := ck.Query(cfa[i].Num)
 			check_same_config(t, c, cfa[i])
 		}
@@ -174,11 +178,11 @@ func TestBasic(t *testing.T) {
 				}
 			}
 		}
+
 		ck.Leave([]int{gid3})
 		ck.Leave([]int{gid4})
 	}
 	fmt.Printf("  ... Passed\n")
-
 	fmt.Printf("Test: Concurrent leave/join ...\n")
 
 	const npara = 10
@@ -203,6 +207,7 @@ func TestBasic(t *testing.T) {
 	for i := 0; i < npara; i++ {
 		<-ch
 	}
+
 	check(t, gids, ck)
 
 	fmt.Printf("  ... Passed\n")

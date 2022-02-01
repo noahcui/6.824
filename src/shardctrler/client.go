@@ -40,7 +40,11 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 func (ck *Clerk) Query(num int) Config {
 	args := &QueryArgs{}
 	// Your code here.
+	args.ClientID = ck.clientID
+	args.ID = ck.counter
+	args.Op = "Query"
 	args.Num = num
+	ck.counter++
 	for {
 		// try each known server.
 		for _, srv := range ck.servers {
@@ -50,7 +54,7 @@ func (ck *Clerk) Query(num int) Config {
 				return reply.Config
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -71,7 +75,7 @@ func (ck *Clerk) Join(servers map[int][]string) {
 				return
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -92,7 +96,7 @@ func (ck *Clerk) Leave(gids []int) {
 				return
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -100,7 +104,11 @@ func (ck *Clerk) Move(shard int, gid int) {
 	args := &MoveArgs{}
 	// Your code here.
 	args.Shard = shard
+	args.ClientID = ck.clientID
 	args.GID = gid
+	args.Op = "Move"
+	args.ID = ck.counter
+	ck.counter++
 
 	for {
 		// try each known server.
@@ -111,6 +119,70 @@ func (ck *Clerk) Move(shard int, gid int) {
 				return
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func (ck *Clerk) Get(key string) string {
+
+	// You will have to modify this function.
+
+	//repeat calling, in incase there's a on going election
+	// i := 0
+	args := GetArgs{
+		Key:      key,
+		ClientID: ck.clientID,
+		ID:       ck.counter,
+	}
+	ck.counter++
+	olde := ck.leaderID
+	for {
+		reply := GetReply{}
+		ok := ck.servers[ck.leaderID].Call("KVServer.Get", &args, &reply)
+		if ok && reply.Err == OK {
+			return reply.Value
+		}
+		if ok && reply.Err == ErrNoKey {
+			return ""
+		}
+		ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
+		//doing election? wait to avoid using resources
+		if olde == ck.leaderID {
+			<-time.After(10 * time.Millisecond)
+		}
+	}
+}
+
+func (ck *Clerk) PutAppend(key string, value string, op string) {
+	// You will have to modify this function.
+
+	args := PutAppendArgs{
+		Key:      key,
+		Value:    value,
+		Op:       op,
+		ClientID: ck.clientID,
+		ID:       ck.counter,
+	}
+	ck.counter++
+	//keep calling until success
+	olde := ck.leaderID
+	for {
+		reply := PutAppendReply{}
+		ok := ck.servers[ck.leaderID].Call("KVServer.PutAppend", &args, &reply)
+		if reply.Err == OK && ok {
+			return
+		}
+		ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
+		//doing election? wait to avoid using resources
+		if olde == ck.leaderID {
+			<-time.After(10 * time.Millisecond)
+		}
+	}
+}
+
+func (ck *Clerk) Put(key string, value string) {
+	ck.PutAppend(key, value, "Put")
+}
+func (ck *Clerk) Append(key string, value string) {
+	ck.PutAppend(key, value, "Append")
 }

@@ -2,6 +2,7 @@ package shardctrler
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"6.824/labgob"
 	"6.824/labrpc"
@@ -34,8 +35,11 @@ type Op struct {
 	Value    string
 	ClientID int64
 	ID       int64
+	Num      int
 	Servers  map[int][]string
 	GIDs     []int
+	Shard    int
+	GID      int
 }
 
 type waiter struct {
@@ -53,7 +57,10 @@ func (sc *ShardCtrler) Kill() {
 	sc.rf.Kill()
 	// Your code here, if desired.
 }
-
+func (sc *ShardCtrler) killed() bool {
+	z := atomic.LoadInt32(&sc.dead)
+	return z == 1
+}
 func (sc *ShardCtrler) resetchan(idx int) {
 	if v, ok := sc.to_exe[idx]; ok {
 		// select {
@@ -66,6 +73,11 @@ func (sc *ShardCtrler) resetchan(idx int) {
 	}
 }
 
+func (sc *ShardCtrler) Startfrompersister() {
+	sc.installsnapshot(sc.persister.ReadSnapshot())
+	sc.lastindex = sc.rf.LastIncludedIndex
+}
+
 //
 // servers[] contains the ports of the set of
 // servers that will cooperate via Paxos to
@@ -75,15 +87,42 @@ func (sc *ShardCtrler) resetchan(idx int) {
 func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister) *ShardCtrler {
 	sc := new(ShardCtrler)
 	sc.me = me
+	sc.maxraftstate = -1
 
 	sc.configs = make([]Config, 1)
 	sc.configs[0].Groups = map[int][]string{}
+	sc.configs[0].Num = 0
 
 	labgob.Register(Op{})
 	sc.applyCh = make(chan raft.ApplyMsg)
 	sc.rf = raft.Make(servers, me, persister, sc.applyCh)
 
 	// Your code here.
+	sc.persister = persister
+	sc.lastindex = 0
+	sc.applyCh = make(chan raft.ApplyMsg)
+	sc.rf = raft.Make(servers, me, persister, sc.applyCh)
+	sc.to_exe = make(map[int]chan bool)
+	sc.counters = make(map[int64]int64)
+
+	// You may need initialization code here.
+	sc.data = make(map[string]string)
+
+	sc.Startfrompersister()
+	go func() {
+		for !sc.killed() {
+			msg := <-sc.applyCh
+			// for msg := range kv.applyCh {
+			// if &msg != nil {
+			if msg.CommandValid {
+				sc.Apply(&msg)
+			} else if msg.SnapshotValid {
+				sc.TryInstallSnapshot(&msg)
+			}
+		}
+		// }
+
+	}()
 
 	return sc
 }
